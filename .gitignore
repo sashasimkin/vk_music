@@ -1,3 +1,10 @@
+sync
+*.sublime-project
+*.sublime-workspace
+.idea/
+Music/
+main-old.py
+#GitHub file
 *.py[cod]
 
 # C extensions
