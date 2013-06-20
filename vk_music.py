@@ -53,7 +53,7 @@ class Song(object):
         try:
             os.remove(os.path.join(self.path, self.name))
             return True
-        except (WindowsError, OSError):
+        except OSError:
             return False
 
     def is_exist(self):
@@ -118,7 +118,7 @@ class VkMusic(object):
 
     def get_cwd(self):
         """
-        Получить текущую папку для синхронизации
+        Get current working directory
         """
         return self.SETTINGS['cwd']
 
@@ -147,10 +147,10 @@ class VkMusic(object):
         except IOError:
             TOKEN_URL = 'https://oauth.vk.com/authorize?client_id=2970439&scope=audio,offline&redirect_uri=http://oauth.vk.com/blank.html&display=wap&response_type=token'
 
-            self.out("""Токен устарел.\n
-            Для получения токена - пройди по ссылке: %s'\n
-            Введи значение access_token сюда: """ % TOKEN_URL,
-                      end="")
+            self.out("""Token outdated.\n
+            Get new token: %s\n
+            Put received value here: """ % TOKEN_URL,
+                     end="")
 
             token = raw_input()
             open(token_file, 'w').write(token)
@@ -158,11 +158,14 @@ class VkMusic(object):
         return token
 
     def get_songs(self):
+        """
+        Get songs to be downloaded
+        """
         songs = json.loads(urllib2.urlopen(self.get_api_url()).read())
         try:
             songs['count'] = len(songs['response'])
         except KeyError:
-            self.exit('Произошла ошибка при получении токена, перезапуск скрипта должен помочь.')
+            self.exit('Error while getting token. Script restarting may help.')
 
         return songs
 
@@ -176,8 +179,8 @@ class VkMusic(object):
         """
         Main function, that does the job according configuration
         e.g:
-        music = VkMusic()
-        music.synchronize()
+        obj = VkMusic()
+        obj.synchronize()
         """
         if self.is_running():
             self.exit('Script already running.', cleanup=False)
@@ -191,17 +194,17 @@ class VkMusic(object):
             'old': self.get_old_songs()
         }
 
-        self.out('Starting download list...')
+        self.out('Starting download list to "%s"...' % self.SETTINGS['cwd'])
 
         for i, song_info in enumerate(songs['response'], 1):
             song = self.SETTINGS['song_class'](self.SETTINGS['cwd'], song_info)
 
-            if song.is_valid():
+            if song.is_valid() and song.is_valid():
                 to_sync['new'].append(song.name)
             else:
                 song.remove()
 
-            if not (song.is_exist() or song.is_valid()):
+            if song.is_exist():
                 self.out("Skip %d: %s" % (i, song.name))
                 continue
 
@@ -215,9 +218,9 @@ class VkMusic(object):
         to_remove = list(set(to_sync['old']) - set(to_sync['new']))
         for i, f in enumerate(to_remove):
             if Song(self.SETTINGS['cwd'], song_name=f).remove():
-                self.out("Removed %d: (%s)" % (i, f))
+                self.out("Removed %d: %s" % (i, f))
             else:
-                self.out("Error while removing %d: (%s), %s" % (i, f, e))
+                self.out("Error while removing %d: %s, %s" % (i, f, e))
 
         self.exit('That is all!')
 
@@ -228,7 +231,7 @@ class VkMusic(object):
     def prnt(self, *args, **kwargs):
         args = list(args)
         for (i, v) in enumerate(args):
-            v = str(v)
+            # v = str(v)
             if isinstance(v, basestring):
                 try:
                     args[i] = unicode(v, "utf-8")
