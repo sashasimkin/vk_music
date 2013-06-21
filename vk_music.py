@@ -40,11 +40,13 @@ class Song(object):
         if not hasattr(self, 'url'):
             raise RuntimeError('Can not load song')
 
-        fc = urllib2.urlopen(self.url).read()
+        file_name = os.path.join(self.path, self.name)
 
-        f = open(os.path.join(self.path, self.name), 'wb+')
-        f.write(fc)
+        f = open(file_name + '.download', 'wb+')
+        f.write(urllib2.urlopen(self.url).read())
         f.close()
+
+        os.rename(file_name + '.download', file_name)
 
     def remove(self):
         """
