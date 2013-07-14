@@ -175,7 +175,7 @@ class VkMusic(object):
         """
         Get old songs list
         """
-        return os.listdir(self.SETTINGS['cwd'])
+        return [unicode(f, 'utf-8') for f in os.listdir(self.SETTINGS['cwd'])]
 
     def synchronize(self):
         """
@@ -201,10 +201,11 @@ class VkMusic(object):
         for i, song_info in enumerate(songs['response'], 1):
             song = self.SETTINGS['song_class'](self.SETTINGS['cwd'], song_info)
 
-            if song.is_valid() and song.is_valid():
+            if song.is_valid():
                 to_sync['new'].append(song.name)
             else:
                 song.remove()
+                continue
 
             if song.is_exist():
                 self.out("Skip %d: %s" % (i, song.name))
@@ -218,13 +219,13 @@ class VkMusic(object):
                 self.out("Saved %d: %s" % (i, song.name))
 
         to_remove = list(set(to_sync['old']) - set(to_sync['new']))
-        for i, f in enumerate(to_remove):
+        for i, f in enumerate(to_remove, 1):
             if Song(self.SETTINGS['cwd'], song_name=f).remove():
                 self.out("Removed %d: %s" % (i, f))
             else:
-                self.out("Error while removing %d: %s, %s" % (i, f, e))
+                self.out("Error while removing %d: %s" % (i, f))
 
-        self.exit('That is all!')
+        self.exit('That is all. Enjoy.')
 
     # Helper functions
     def out(self, *args, **kwargs):
@@ -237,17 +238,24 @@ class VkMusic(object):
             if isinstance(v, basestring):
                 try:
                     args[i] = unicode(v, "utf-8")
-                except TypeError:
-                    args[i] = v.encode("utf-8")
+                except (TypeError, UnicodeDecodeError):
+                    try:
+                        args[i] = v.encode("utf-8")
+                    except UnicodeDecodeError:
+                        pass
 
         return print(*args, **kwargs)
 
     def exit(self, *args, **kwargs):
+        silent = kwargs.pop('silent', False)
+
         if kwargs.get('cleanup', True):
             try:
                 os.remove(self.SETTINGS['lock'])
             except (OSError, KeyError):
                 pass
 
-        self.out(*args, **kwargs)
+        if not silent:
+            self.out(*args, **kwargs)
+
         return exit()
