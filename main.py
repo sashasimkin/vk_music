@@ -23,8 +23,8 @@ if __name__ == '__main__':
 
     manager = VkMusic(
         cwd=DIR,
-        client_id=2970439,  # VK Application id, can use this
-        uid=60411837  # You VK-id
+        client_id=2970439,  # VK Application id, you can use this
+        uid=60411837  # Your VK-id
     )
 
     #If script not running - register safe exit with cleanup
