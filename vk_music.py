@@ -17,6 +17,7 @@ class Song(object):
             raise OSError('Directory "%s" does not exist' % workdir)
 
         self.path = workdir
+
         #Process song dict to class props
         if song is not None:
             #File name
@@ -143,19 +144,22 @@ class VkMusic(object):
         return url
 
     def get_token(self):
-        token_file = os.path.join(tempfile.gettempdir(), 'vk_token.txt')
+        if self.SETTINGS.get('token'):
+            return self.SETTINGS.get('token')
+
+        self.SETTINGS['token_file'] = os.path.join(tempfile.gettempdir(), 'vk_token.txt')
         try:
-            token = open(token_file, 'r').read()
+            token = open(self.SETTINGS['token_file'], 'r').read()
         except IOError:
             TOKEN_URL = 'https://oauth.vk.com/authorize?client_id=2970439&scope=audio,offline&redirect_uri=http://oauth.vk.com/blank.html&display=wap&response_type=token'
 
-            self.out("""Token outdated.\n
+            self.out("""There is no token available.\n
             Get new token: %s\n
             Put received value here: """ % TOKEN_URL,
                      end="")
 
             token = raw_input()
-            open(token_file, 'w').write(token)
+            open(self.SETTINGS['token_file'], 'w').write(token)
 
         return token
 
@@ -167,7 +171,11 @@ class VkMusic(object):
         try:
             songs['count'] = len(songs['response'])
         except KeyError:
-            self.exit('Error while getting token. Script restarting may help.')
+            # If token stored in file - remove it
+            if self.SETTINGS.get('token_file'):
+                os.remove(self.SETTINGS.get('token_file'))
+
+            self.exit('Token outdated. Please restart script.')
 
         return songs
 
@@ -175,7 +183,7 @@ class VkMusic(object):
         """
         Get old songs list
         """
-        return [unicode(f, 'utf-8') for f in os.listdir(self.SETTINGS['cwd'])]
+        return [unicode(f) for f in os.listdir(self.SETTINGS['cwd'])]
 
     def synchronize(self):
         """
