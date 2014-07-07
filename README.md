@@ -1,6 +1,10 @@
 vk_music
 ========
-Python script for downloading music from vk.com with ability to behaviour customization.
+Python package for downloading music from vk.com with ability to behaviour customization.
+
+Usage
+========
+
 
 Usage
 ========

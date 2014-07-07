@@ -1,0 +1,2 @@
+SAVED = 1
+SKIPPED = 2
