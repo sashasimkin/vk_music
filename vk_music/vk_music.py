@@ -3,7 +3,6 @@ from __future__ import print_function
 import os
 import urllib2
 import json
-import tempfile
 
 from .utils import prnt, replace_chars
 from .exceptions import *
@@ -89,9 +88,18 @@ class VkMusic(object):
             'uid': None,
             'gid': None,
             'from': 0,
-            'to': None
+            'to': None,
+            'token_dir': '~/.vk-music',
+            'redirect_url': 'https://sima.pro/public/token.html'
         }
         self.SETTINGS.update(kwargs)
+        # Process ~ inside path and create directory for data
+        self.SETTINGS['token_dir'] = os.path.expanduser(self.SETTINGS['token_dir'])
+        try:
+            os.makedirs(self.SETTINGS['token_dir'])
+        except OSError as e:
+            if e.errno != 17:
+                self.exit('Can\'t create data directory: %s' % e)
 
         if (not self.SETTINGS['uid'] and not self.SETTINGS['gid']) or not self.SETTINGS['client_id']:
             raise ValueError('You must provide client_id and uid or gid')
@@ -119,7 +127,6 @@ class VkMusic(object):
         try:
             token = self.get_token()
         except Exception, e:
-
             self.exit('Problems within getting token: %s' % e)
 
         url = 'https://api.vkontakte.ru/method/audio.get.json?uid=%s&access_token=%s'\
@@ -133,7 +140,7 @@ class VkMusic(object):
 
     @property
     def token_file(self):
-        return self.SETTINGS.get('token_file', os.path.join(tempfile.gettempdir(), 'vk_token.txt'))
+        return os.path.join(self.SETTINGS['token_dir'], 'token.txt')
 
     def clear_token(self):
         os.remove(self.token_file)
@@ -148,13 +155,11 @@ class VkMusic(object):
         try:
             token = open(self.token_file, 'r').read()
         except IOError:
-            token_url = 'https://oauth.vk.com/authorize?client_id=2970439&scope=audio,offline&redirect_uri=' \
-                        'http://oauth.vk.com/blank.html&display=wap&response_type=token'
+            token_url = 'https://oauth.vk.com/authorize?client_id=%(client_id)s&scope=audio,offline&redirect_uri=' \
+                        '%(redirect_url)s&display=page&response_type=token' % self.SETTINGS
 
-            self.out("""There is no token available.\n
-            Get the new token: %s\n
-            Put received value here: """ % token_url,
-                     end="")
+            self.out("Open this URL in browser: %s\n"
+                     "Then copy token from url: " % token_url, end="")
 
             token = raw_input()
             self.store_token(token)

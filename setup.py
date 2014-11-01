@@ -1,8 +1,9 @@
-from distutils.core import setup
+# from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='vk-music',
-    version='1.0.0',
+    version='1.1.0',
     packages=['vk_music'],
     install_requires=[
         "progressbar",

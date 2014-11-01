@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import os
-# import atexit
 import argparse
 from subprocess import call
 
@@ -13,19 +12,25 @@ from .storage import ProgressStorage
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('dir', type=str, nargs='?', help="Directory for sync")
-    parser.add_argument("-token", type=str, help="access token")
+    parser.add_argument('dir', type=str, nargs='?', help="Directory for synchronization")
+    parser.add_argument("-uid", type=int, default=60411837, help="Vk user id")  # Default is my VK id :-)
+    parser.add_argument("-token", type=str, help="access token to use")
+    parser.add_argument("-token_dir", type=str, help="Directory where script will save token and temp data")
     parser.add_argument("-f", dest='force', default=False, action='store_true', help="Ignore already running error")
-    parser.add_argument("-from", type=int, help="Start downloading from position")
-    parser.add_argument("-to", type=int, help="End on position")
-    parser.add_argument("-token_file", type=str, help="File for storing access token")
-    parser.add_argument("-uid", type=int, help="Vk user id")
-    args = parser.parse_args()
+    parser.add_argument("-from", type=int, default=0, help="Start downloading from position")
+    parser.add_argument("-to", type=int, help="End downloading on position")
+    parser.add_argument("-redirect_url", type=str, help="Redirect url after getting token")
+    args = vars(parser.parse_args())
 
-    # print(args.dir.decode('utf-8'))
-    #exit()
+    # Don't let not passed arguments to be
+    for k, v in args.items():
+        if v is None:
+            del args[k]
 
-    DIR = args.dir and args.dir.decode('utf-8') or os.getcwd() + '/Music'
+    # Application ID from VK. ou can leave it as is
+    args['client_id'] = 2970439
+
+    DIR = args.get('dir', '').decode('utf-8') or os.getcwd() + '/Music'
     try:
         #Try to create directory if not exists
         if not os.path.isdir(DIR):
@@ -38,22 +43,9 @@ def main():
     except Exception as e:
         exit("Problem with directory '%s': %s" % (DIR, e))
 
-    manager_kwargs = {
-        'force': args.force
-    }
-
-    if getattr(args, 'from', None):
-        manager_kwargs['from'] = getattr(args, 'from', None)
-
-    if args.to:
-        manager_kwargs['to'] = args.to
-
-    if args.token:
-        manager_kwargs['token'] = args.token
-
     storage = ProgressStorage(DIR)
     try:
-        with VkMusic(storage, client_id=2970439, uid=60411837, **manager_kwargs) as manager:
+        with VkMusic(storage, **args) as manager:
             # Start working
             result = manager.synchronize()
             try:

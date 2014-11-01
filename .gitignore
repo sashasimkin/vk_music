@@ -2,6 +2,7 @@ sync
 *.sublime-project
 *.sublime-workspace
 .idea/
+.env/
 Music/
 main-old.py
 #GitHub file
