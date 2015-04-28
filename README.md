@@ -31,3 +31,7 @@ optional arguments:
                         Redirect url after getting token
 ```
 Also you can subclass vk_music.VkMusic and customize it for you needs.
+
+Notes
+========
+If you always receiving token request - you should obtain token from same IP address as machine you running script.
