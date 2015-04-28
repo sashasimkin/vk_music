@@ -60,3 +60,6 @@ def main():
     except AlreadyRunningError:
         # If is running - terminate
         print('Other sync process is running. Please wait')
+        
+if __name__ == '__main__':
+    main()
