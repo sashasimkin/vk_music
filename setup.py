@@ -3,19 +3,20 @@ from setuptools import setup
 
 setup(
     name='vk-music',
-    version='1.1.0',
+    version='1.2.0',
     packages=['vk_music'],
     install_requires=[
-        "progressbar",
+        "progressbar==2.3",
+        "six==1.9.0",
     ],
     entry_points={
         'console_scripts': [
-            'vk_music = vk_music.main:main',
+            'vk_music = vk_music.__main__:main',
         ]
     },
     url='https://github.com/sashasimkin/vk_music',
     license='MIT',
-    author='sashasimkin',
+    author='Alex Simkin',
     author_email='sashasimkin@gmail.com',
     description='Synchronize music with vk.com',
 

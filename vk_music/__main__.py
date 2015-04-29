@@ -7,7 +7,7 @@ from subprocess import call
 
 from .vk_music import VkMusic
 from .exceptions import AlreadyRunningError
-from .storage import ProgressStorage
+from .storage import CachedProgressStorage
 
 
 def main():
@@ -37,13 +37,13 @@ def main():
             os.makedirs(DIR)
 
         # Need write access to that dir
-        os.chmod(DIR, 0777)
+        os.chmod(DIR, 0o755)
         if not os.access(DIR, os.W_OK):
             raise Exception('Permission denied for dir %s' % DIR)
     except Exception as e:
         exit("Problem with directory '%s': %s" % (DIR, e))
 
-    storage = ProgressStorage(DIR)
+    storage = CachedProgressStorage(DIR)
     try:
         with VkMusic(storage, **args) as manager:
             # Start working

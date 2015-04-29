@@ -1,6 +1,7 @@
 import os
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 from progressbar import ProgressBar, Percentage
+import sys
 from .consts import SKIPPED, SAVED
 
 os_join = os.path.join
@@ -57,7 +58,7 @@ class FileSystemStorage(BaseStorage):
         return self.dir
 
     def files_list(self):
-        return [f for f in os.listdir(self.dir)]
+        return [f.decode(sys.getfilesystemencoding()) for f in os.listdir(self.dir)]
 
     def touch(self, file_name, times=None):
         fname = os_join(self.dir, file_name)
@@ -84,24 +85,36 @@ class FileSystemStorage(BaseStorage):
 chunk_size = 512 * 1024  # By default notify about every 500Kb write
 
 
-class ProgressStorage(FileSystemStorage):
+class CachedProgressStorage(FileSystemStorage):
+    # def __init__(self, *args, **kwargs):
+    #     super(CachedProgressStorage, self).__init__(*args, **kwargs)
+    #     self._files_list = {v: True for v in self.files_list()}
+
+    def files_list(self):
+        if not hasattr(self, '_files_list'):
+            self._files_list = super(CachedProgressStorage, self).files_list()
+
+        return self._files_list
+
+    def exists(self, file_name):
+        return file_name in self.files_list()
+
     def write_simple(self, *args, **kwargs):
-        return super(ProgressStorage, self).write(*args, **kwargs)
+        return super(CachedProgressStorage, self).write(*args, **kwargs)
 
     def write(self, file_name, remote, **kwargs):
         file_size = int(remote.info()['Content-Length'])
 
+        # ToDo: Get rid of progressbar prior to urlretrieve
+        # and it's hook. Or think about requests/ayncio
         pbar = ProgressBar(file_size,
                            widgets=[unicode(kwargs.get('number')), '. [', Percentage(), '] ', '%s %s' % ('Downloading', file_name)]).start()
 
         if self.exists(file_name):
-            with open(os_join(self.dir, file_name), 'rb') as old_f:
-                old_f.seek(0, os.SEEK_END)
-                old_size = old_f.tell()
-
-                if old_size == file_size:
-                    pbar.update(file_size)
-                    return SKIPPED
+            if file_size == os.path.getsize(os_join(self.dir, file_name)):
+                pbar.update(file_size)
+                pbar.finish()
+                return SKIPPED
 
         file_path = os_join(self.dir, file_name)
         dl_path = file_path + '.dl'

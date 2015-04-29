@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+from collections import Counter
 import os
-import urllib2
 import json
 
 from .utils import prnt, replace_chars
 from .exceptions import *
 from .consts import SAVED, SKIPPED
+from datetime import datetime
+
+from six.moves import input as read_input
+from six.moves import urllib
 
 
 class Song(object):
@@ -33,9 +37,10 @@ class Song(object):
         #Process song dict to class props
         try:
             self.name = song.get('name', None) or ('%s - %s.mp3' % (song['artist'].strip(), song['title'].strip()))
-            self.name = replace_chars(self.name, ('/', '\\', '"', '?', '!', ':', ';', '<', '>'))
+            self.name = replace_chars(self.name, ('/', '\\', '?', '%', '*', ':', '|', '"', '<', '>', ';', '!'))
             self.name = os.path.normpath(self.name)
         except KeyError:
+            # self.name = replace_chars(self.name, ('/', '\\', '?', '%', '*', ':', '|', '"', '<', '>', '.', ';', '!'))
             RuntimeError('For creation "Song" object you must provide '
                          '{dict}"song" argument with name or artist and title')
 
@@ -54,7 +59,7 @@ class Song(object):
             raise RuntimeError('Can not load song')
 
         # r means remote file
-        r = urllib2.urlopen(self.url)
+        r = urllib.request.urlopen(self.url)
 
         # Such kind of manipulation need in case of errors and broken files later
         return self.storage.write(self.name, r, number=kwargs.get('number', None))
@@ -126,10 +131,10 @@ class VkMusic(object):
         """
         try:
             token = self.get_token()
-        except Exception, e:
+        except Exception as e:
             self.exit('Problems within getting token: %s' % e)
 
-        url = 'https://api.vkontakte.ru/method/audio.get.json?uid=%s&access_token=%s'\
+        url = 'https://api.vk.com/method/audio.get.json?uid=%s&access_token=%s'\
               %\
               (self.SETTINGS['uid'], token)
 
@@ -161,7 +166,7 @@ class VkMusic(object):
             self.out("Open this URL in browser: %s\n"
                      "Then copy token from url: " % token_url, end="")
 
-            token = raw_input()
+            token = read_input()
             self.store_token(token)
 
         return token
@@ -173,7 +178,7 @@ class VkMusic(object):
         s_from = self.SETTINGS['from']
         s_to = self.SETTINGS['to']
         while True:
-            songs = json.loads(urllib2.urlopen(self.get_api_url()).read())
+            songs = json.loads(urllib.request.urlopen(self.get_api_url()).read())
             try:
                 songs['count'] = len(songs['response'])
                 songs['response'] = songs['response'][s_from:s_to]
@@ -192,7 +197,7 @@ class VkMusic(object):
         obj = VkMusic()
         obj.synchronize()
         """
-        stats = {'saved': 0, 'skipped': 0, 'removed': 0, 'not_removed': 0}
+        stats = Counter()
         self.out('Fetching music list...')
 
         songs = self.get_songs()
@@ -208,7 +213,8 @@ class VkMusic(object):
             SAVED: 'saved',
             SKIPPED: 'skipped'
         }
-        for i, song_info in enumerate(songs['response'], 1):
+        i = 0
+        for song_info in songs['response']:
             song = self.song_class(self.storage, song_info)
 
             if song.in_blacklist():
@@ -219,8 +225,9 @@ class VkMusic(object):
             try:
                 status = song.save(number=i)
                 stats[status_stats[status]] += 1
-            except OSError, e:
+            except (OSError, urllib.error.HTTPError) as e:
                 self.out("Error %d: %s, %s" % (i, song.name, str(e)))
+            i += 1
 
         if self.SETTINGS['from'] == 0 and self.SETTINGS['to'] is None:
             to_remove = list(set(to_sync['old']) - set(to_sync['new']))
@@ -240,7 +247,7 @@ class VkMusic(object):
     # Helper functions
     @staticmethod
     def out(*args, **kwargs):
-        return prnt(*args, **kwargs)
+        return prnt('[{}]'.format(datetime.now().isoformat()), *args, **kwargs)
 
     def exit(self, *args, **kwargs):
         self.__exit__()
