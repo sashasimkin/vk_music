@@ -58,7 +58,12 @@ class FileSystemStorage(BaseStorage):
         return self.dir
 
     def files_list(self):
-        return [f.decode(sys.getfilesystemencoding()) for f in os.listdir(self.dir)]
+        for name in os.listdir(self.dir):
+            try:
+                name = name.decode(sys.getfilesystemencoding())
+            except UnicodeEncodeError:  # Assume that it's already unicode
+                pass
+            yield name
 
     def touch(self, file_name, times=None):
         fname = os_join(self.dir, file_name)
@@ -92,7 +97,8 @@ class CachedProgressStorage(FileSystemStorage):
 
     def files_list(self):
         if not hasattr(self, '_files_list'):
-            self._files_list = super(CachedProgressStorage, self).files_list()
+            # Load immediately into memory. We don't need generator here
+            self._files_list = list(super(CachedProgressStorage, self).files_list())
 
         return self._files_list
 
