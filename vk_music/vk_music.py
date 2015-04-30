@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 from collections import Counter
 import os
 import json
+import Queue
+import threading
+import traceback
+
+from six.moves import input as read_input
+from six.moves import urllib
 
 from .utils import prnt, replace_chars
 from .exceptions import *
 from .consts import SAVED, SKIPPED
-from datetime import datetime
 
-from six.moves import input as read_input
-from six.moves import urllib
+from .utils import print_out
 
 
 class Song(object):
@@ -29,26 +33,21 @@ class Song(object):
         @param song: Dict with artist, title and url fields or only name
         @param args:
         @param kwargs:
-        @raise RuntimeError:
+        @raise TypeError:
         """
         self.storage = storage
         self.manager = kwargs.get('manager', None)
 
-        #Process song dict to class props
+        # Process song dict to class props
         try:
             self.name = song.get('name', None) or ('%s - %s.mp3' % (song['artist'].strip(), song['title'].strip()))
             self.name = replace_chars(self.name, ('/', '\\', '?', '%', '*', ':', '|', '"', '<', '>', ';', '!'))
             self.name = os.path.normpath(self.name)
         except KeyError:
-            # self.name = replace_chars(self.name, ('/', '\\', '?', '%', '*', ':', '|', '"', '<', '>', '.', ';', '!'))
-            RuntimeError('For creation "Song" object you must provide '
-                         '{dict}"song" argument with name or artist and title')
+            TypeError('For creation "Song" object you must provide '
+                      '{dict}"song" argument with name or artist and title')
 
         self.url = song.get('url', None)
-
-    def out(self, *args, **kwargs):
-        if self.manager:
-            self.manager.out(*args, **kwargs)
 
     def save(self, **kwargs):
         """
@@ -61,8 +60,8 @@ class Song(object):
         # r means remote file
         r = urllib.request.urlopen(self.url)
 
-        # Such kind of manipulation need in case of errors and broken files later
-        return self.storage.write(self.name, r, number=kwargs.get('number', None))
+        # Such kind of manipulation need later in case of errors and broken files
+        return self.storage.write(self.name, r)
 
     def remove(self):
         """
@@ -79,6 +78,7 @@ class Song(object):
 
 
 class VkMusic(object):
+    # ToDo: Implement verbosity level
     song_class = Song
 
     def __init__(self, storage, *args, **kwargs):
@@ -95,7 +95,8 @@ class VkMusic(object):
             'from': 0,
             'to': None,
             'token_dir': '~/.vk-music',
-            'redirect_url': 'https://sima.pro/public/token.html'
+            'redirect_url': 'https://sima.pro/public/token.html',
+            'threads': 2
         }
         self.SETTINGS.update(kwargs)
         # Process ~ inside path and create directory for data
@@ -108,6 +109,9 @@ class VkMusic(object):
 
         if (not self.SETTINGS['uid'] and not self.SETTINGS['gid']) or not self.SETTINGS['client_id']:
             raise ValueError('You must provide client_id and uid or gid')
+
+        if kwargs.get('song_class'):
+            self.song_class = kwargs.get('song_class')
 
     def __enter__(self):
         if self.storage.exists('.lock') and not self.SETTINGS.get('force', False):
@@ -123,7 +127,7 @@ class VkMusic(object):
             print('Error in exit: %s' % e)
 
         if exc_type:
-            self.out(exc_type, exc_val, exc_tb)
+            print_out(exc_type, exc_val, exc_tb)
 
     def get_api_url(self):
         """
@@ -163,8 +167,8 @@ class VkMusic(object):
             token_url = 'https://oauth.vk.com/authorize?client_id=%(client_id)s&scope=audio,offline&redirect_uri=' \
                         '%(redirect_url)s&display=page&response_type=token' % self.SETTINGS
 
-            self.out("Open this URL in browser: %s\n"
-                     "Then copy token from url: " % token_url, end="")
+            print_out("Open this URL in browser: %s\n"
+                      "Then copy token from url: " % token_url, end="")
 
             token = read_input()
             self.store_token(token)
@@ -177,18 +181,21 @@ class VkMusic(object):
         """
         s_from = self.SETTINGS['from']
         s_to = self.SETTINGS['to']
-        while True:
-            songs = json.loads(urllib.request.urlopen(self.get_api_url()).read())
+        retries = 3
+        while retries:
+            response = json.loads(urllib.request.urlopen(self.get_api_url()).read())
             try:
-                songs['count'] = len(songs['response'])
-                songs['response'] = songs['response'][s_from:s_to]
+                response['count'] = len(response['response'])
+                response['response'] = response['response'][s_from:s_to]
                 break
             except KeyError:
                 # Clear old token and get new
+                print_out('Error while fetching music, response: {}'.format(response))
                 self.clear_token()
                 self.get_token(force_new=True)
+            retries -= 1
 
-        return songs
+        return response
 
     def synchronize(self):
         """
@@ -198,7 +205,7 @@ class VkMusic(object):
         obj.synchronize()
         """
         stats = Counter()
-        self.out('Fetching music list...')
+        print_out('Fetching music list...')
 
         songs = self.get_songs()
 
@@ -207,12 +214,32 @@ class VkMusic(object):
             'old': self.storage.files_list()
         }
 
-        self.out('Starting download list to "%s"...' % self.storage.get_id())
+        print_out('Starting download list to "%s"...' % self.storage.get_id())
 
         status_stats = {
             SAVED: 'saved',
             SKIPPED: 'skipped'
         }
+
+        # Setup queue for songs
+        queue = Queue.Queue()
+
+        def worker():  # Setup worker that will do all the work
+            while True:  # why 'True'? Maybe while queue
+                try:
+                    idx, song = queue.get()
+                    print_out('{}. Downloading: {}'.format(idx, song.name))
+                    status = song.save()
+                    text_status = status_stats[status]
+                    stats[text_status] += 1
+                    print_out('{}. {}: {}'.format(idx, text_status.capitalize(), song.name))
+                except (OSError, urllib.error.HTTPError) as e:
+                    print_out("Error %d: %s, %s" % (i, song.name, str(e)))
+                except Exception as e:
+                    print_out("Critical error (please fill issue) %d: %s, %s" % (i, song.name, traceback.format_exc()))
+                finally:
+                    queue.task_done()
+
         i = 0
         for song_info in songs['response']:
             song = self.song_class(self.storage, song_info)
@@ -222,35 +249,35 @@ class VkMusic(object):
             else:
                 to_sync['new'].append(song.name)
 
-            try:
-                status = song.save(number=i)
-                stats[status_stats[status]] += 1
-            except (OSError, urllib.error.HTTPError) as e:
-                self.out("Error %d: %s, %s" % (i, song.name, str(e)))
+            queue.put((i, song))
             i += 1
 
+        # Setup threads
+        for i in range(self.SETTINGS['threads']):
+            t = threading.Thread(target=worker)
+            t.daemon = True
+            t.start()
+
+        queue.join()  # block until all tasks are done
+
+        # Then do cleanup
         if self.SETTINGS['from'] == 0 and self.SETTINGS['to'] is None:
             to_remove = list(set(to_sync['old']) - set(to_sync['new']))
             for i, f in enumerate(to_remove, 1):
                 try:
                     Song(self.storage, {'name': f}).remove()
                     stats['removed'] += 1
-                    self.out("%s. Removed %s" % (i, f))
+                    print_out("%s. Removed %s" % (i, f))
                 except OSError as e:
                     stats['not_removed'] += 1
-                    self.out("%s. Error while removing %s, exc_info: %s" % (i, f, e))
+                    print_out("{}. Error while removing {}, exc_info: {}".format(i, f, e))
 
-        self.out('That is all. Enjoy.')
+        print_out('That is all. Enjoy.')
 
         return stats
 
-    # Helper functions
-    @staticmethod
-    def out(*args, **kwargs):
-        return prnt('[{}]'.format(datetime.now().isoformat()), *args, **kwargs)
-
     def exit(self, *args, **kwargs):
         self.__exit__()
-        self.out(*args, **kwargs)
+        print_out(*args, **kwargs)
 
         return exit()

@@ -3,10 +3,10 @@ from setuptools import setup
 
 setup(
     name='vk-music',
-    version='1.2.1',
+    version='1.3.0',
     packages=['vk_music'],
     install_requires=[
-        "progressbar==2.3",
+        # "progressbar==2.3",
         "six==1.9.0",
     ],
     entry_points={

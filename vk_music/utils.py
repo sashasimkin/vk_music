@@ -1,4 +1,9 @@
 from __future__ import print_function
+from datetime import datetime
+
+
+def print_out(*args, **kwargs):
+        return prnt('[{}]'.format(datetime.now().isoformat()), *args, **kwargs)
 
 
 def prnt(*args, **kwargs):

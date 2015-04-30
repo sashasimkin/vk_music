@@ -22,6 +22,8 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -uid UID              Vk user id
+  -client_id CID              Client application id
+  --threads[-t] 2       Count of threads where perform the work
   -token TOKEN          access token to use
   -token_dir TOKEN_DIR  Directory where script will save token and temp data
   -f                    Ignore already running error
@@ -34,4 +36,5 @@ Also you can subclass vk_music.VkMusic and customize it for you needs.
 
 Notes
 ========
-If you always receiving token request - you should obtain token from same IP address as machine you running script.
+* If you always receiving token request - you should obtain token from same IP address as machine you running script.
+* You can see examples in defaults.py

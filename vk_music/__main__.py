@@ -7,13 +7,15 @@ from subprocess import call
 
 from .vk_music import VkMusic
 from .exceptions import AlreadyRunningError
-from .storage import CachedProgressStorage
+from .defaults import SafeFsStorage
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('dir', type=str, nargs='?', help="Directory for synchronization")
     parser.add_argument("-uid", type=int, default=60411837, help="Vk user id")  # Default is my VK id :-)
+    parser.add_argument("-client_id", type=int, default=2970439, help="Application id")  # Application ID from VK
+    parser.add_argument("--threads", "-t", type=int, default=2, help="Number of threads to use")
     parser.add_argument("-token", type=str, help="access token to use")
     parser.add_argument("-token_dir", type=str, help="Directory where script will save token and temp data")
     parser.add_argument("-f", dest='force', default=False, action='store_true', help="Ignore already running error")
@@ -27,23 +29,20 @@ def main():
         if v is None:
             del args[k]
 
-    # Application ID from VK. ou can leave it as is
-    args['client_id'] = 2970439
-
-    DIR = args.get('dir', '').decode('utf-8') or os.getcwd() + '/Music'
+    workdir = args.get('dir', '').decode('utf-8') or os.getcwd() + '/Music'
     try:
-        #Try to create directory if not exists
-        if not os.path.isdir(DIR):
-            os.makedirs(DIR)
+        # Try to create directory if not exists
+        if not os.path.isdir(workdir):
+            os.makedirs(workdir)
 
         # Need write access to that dir
-        os.chmod(DIR, 0o755)
-        if not os.access(DIR, os.W_OK):
-            raise Exception('Permission denied for dir %s' % DIR)
+        os.chmod(workdir, 0o755)
+        if not os.access(workdir, os.W_OK):
+            raise Exception('Permission denied for dir %s' % workdir)
     except Exception as e:
-        exit("Problem with directory '%s': %s" % (DIR, e))
+        exit("Problem with directory '%s': %s" % (workdir, e))
 
-    storage = CachedProgressStorage(DIR)
+    storage = SafeFsStorage(workdir)
     try:
         with VkMusic(storage, **args) as manager:
             # Start working
