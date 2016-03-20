@@ -95,7 +95,7 @@ class VkMusic(object):
             'from': 0,
             'to': None,
             'token_dir': '~/.vk-music',
-            'redirect_url': 'https://sima.pro/public/token.html',
+            'redirect_url': 'http://sima.pro/public/token.html',
             'threads': 2
         }
         self.SETTINGS.update(kwargs)
