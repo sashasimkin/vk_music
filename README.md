@@ -1,3 +1,5 @@
+# ***This project is unmaintained***
+
 vk_music
 ========
 Python package for downloading music from vk.com with ability to customize behaviour.
